@@ -39,7 +39,6 @@ ENV/
 # Training artifacts
 checkpoints/
 runs/
-logs/
 *.pt
 *.pth
 *.ckpt
