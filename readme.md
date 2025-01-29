@@ -18,7 +18,7 @@ A clean and efficient implementation for training LLaMA 3 models, focused on sim
 
 1. Recommend to use Docker to run the code
 ```
-docker push xiaotian99/llm_pt25:v0.3
+docker pull xiaotian99/llm_pt25:v0.3
 ```
 or use the [sglang official image](https://hub.docker.com/r/lmsysorg/sglang/tags).
 
