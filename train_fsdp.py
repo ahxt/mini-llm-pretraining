@@ -116,7 +116,7 @@ def save_model(global_rank, model, tokenizer, outpath, current_step):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", type=str, default="meta-llama/Llama-3.2-1B")
-    parser.add_argument("--tokenizer_name", type=str, default="mistralai/Mistral-7B-v0.1")
+    parser.add_argument("--tokenizer_name", type=str, default="meta-llama/Llama-3.2-1B")
     parser.add_argument("--sequence_length", type=int, default=2048)
     parser.add_argument("--dtype", type=str, default="bfloat16", help="float32|float16|bfloat16")
     parser.add_argument("--attn_impl", type=str, default="flash_attention_3", help="flash_attention_2|sdpa|flex|eager|flash_attention_3")
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     gradient_clipping = 1.0
 
     if global_rank == 0:
-        run = wandb.init(project="llama-1b", name=run_id, config=vars(args),)
+        run = wandb.init(project="spped-llama-1b", name=run_id, config=vars(args),)
         print(args)
         for key, value in vars(args).items():
             print(f"{key}{'-' * max(0, 80 - len(key) - len(str(value)))}{value}")

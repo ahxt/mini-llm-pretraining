@@ -64,3 +64,4 @@ coverage.xml
 #
 wandb/
 data/
+outputs/
