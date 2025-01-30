@@ -27,7 +27,7 @@ def disable_model_dropout(model: torch.nn.Module):
             module.p = 0
 
 
-def evaluation(model, eval_dataloader, wandb, local_rank, current_step):
+def evaluation(model, eval_dataloader, current_step):
     if global_rank == 0:
         print("Running evaluation......")
 
@@ -49,26 +49,11 @@ def evaluation(model, eval_dataloader, wandb, local_rank, current_step):
     val_losses = val_losses / total_steps
     val_loss = get_all_reduce_mean(val_losses.detach().clone()).item()
     if global_rank == 0:
-        if wandb:
-            wandb.log({"val_loss": val_loss,}, step=current_step)
         print(f"\nValidation Loss: {val_loss:.4f}")
 
     model.train()
     torch.cuda.empty_cache()
     return val_loss
-
-
-def get_parameter_names(model, forbidden_layer_types):
-    result = []
-    for name, child in model.named_children():
-        result += [
-            f"{name}.{n}"
-            for n in get_parameter_names(child, forbidden_layer_types)
-            if not isinstance(child, tuple(forbidden_layer_types))
-        ]
-
-    result += list(model._parameters.keys())
-    return result
 
 
 def get_all_reduce_mean(tensor):
@@ -79,7 +64,6 @@ def get_all_reduce_mean(tensor):
 
 def clip_model_gradients(model, max_grad_norm):
     return model.clip_grad_norm_(max_grad_norm).item()
-
 
 
 def save_model(global_rank, model, tokenizer, outpath, current_step):
@@ -119,6 +103,7 @@ if __name__ == "__main__":
     parser.add_argument("--grad_clip", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=14159)
     parser.add_argument("--scheduler_type", type=str, default="cosine")
+    parser.add_argument("--wandb_project", type=str, default="speed-llama-1b")
 
     args = parser.parse_args()
 
@@ -152,12 +137,11 @@ if __name__ == "__main__":
     gradient_clipping = 1.0
 
     if global_rank == 0:
-        run = wandb.init(project="spped-llama-1b", name=run_id, config=vars(args),)
+        run = wandb.init(project=args.wandb_project, name=run_id, config=vars(args),)
         print(args)
         for key, value in vars(args).items():
             print(f"{key}{'-' * max(0, 80 - len(key) - len(str(value)))}{value}")
         
-
     # config = transformers.AutoConfig.from_pretrained(model_name, token=os.environ["HF_TOKEN"])
     config = transformers.AutoConfig.from_pretrained(model_name)
     config.use_cache = False
@@ -244,15 +228,17 @@ if __name__ == "__main__":
 
     losses = 0
 
-    validation_loss = evaluation(model, val_loader, None, global_rank, 0)
+    validation_loss = evaluation(model, val_loader, 0)
 
-    # args.max_steps = min(args.max_steps, len(train_loader)//args.acc_steps)
+    args.max_steps = min(args.max_steps, len(train_loader)//args.acc_steps)
 
     # scheduler = get_scheduler(global_rank, scheduler_type, optimizer, args.max_steps)
     scheduler = transformers.get_scheduler(name=args.scheduler_type, 
                                            optimizer=optimizer, 
                                            num_warmup_steps=args.warmup_steps, 
-                                           num_training_steps=args.max_steps,)
+                                           num_training_steps=1000000,   
+                                        #    num_training_steps=args.max_steps,
+                                           )
 
     step_start_time = time.time()
     training_start_time = time.time()
@@ -291,15 +277,19 @@ if __name__ == "__main__":
                     throughput = (args.sequence_length * args.total_batch_size*args.log_steps) / duration_time
                     seen_tokens = current_step * args.total_batch_size * args.sequence_length
                     last_lr = scheduler.get_last_lr()[0]
-                    status_dict = {"current_loss": train_loss/args.acc_steps, "learning_rate": last_lr, "throughput": throughput}
-                    wandb.log(status_dict, step=current_step)
                     remaining_time = (args.max_steps - current_step) * duration_time / args.log_steps
-                    print(f"Step: {current_step:05d}/{args.max_steps:05d}, Loss:{train_loss/args.acc_steps:.4f}, LR: {last_lr:.6f}, Thruput: {throughput:.2f}, Seen Tokens: {seen_tokens}, Duration: {duration_time:.3f}s, Consumed Time: {time.strftime('%H:%M:%S', time.gmtime(time.time() - training_start_time))}, Remaining Time: {time.strftime('%H:%M:%S', time.gmtime(remaining_time))}",)
+
+                    status_dict = {"train_loss": train_loss/args.acc_steps, "learning_rate": last_lr, "throughput": throughput, "seen_tokens": seen_tokens, "duration": duration_time, "consumed_time": time.strftime('%H:%M:%S', time.gmtime(time.time() - training_start_time)), "remaining_time": time.strftime('%H:%M:%S', time.gmtime(remaining_time))}
+                    wandb.log(status_dict, step=current_step)
+                    print(f"{current_step:05d}/{args.max_steps:05d}, train_loss: {status_dict['train_loss']:.4f}, lr: {status_dict['learning_rate']:.6f}, thruput: {status_dict['throughput']:.2f}, seen_tokens: {status_dict['seen_tokens']}, duration: {status_dict['duration']:.3f}s, consumed: {status_dict['consumed_time']}, remaining: {status_dict['remaining_time']}")
+                    # print(f"{current_step:05d}/{args.max_steps:05d}, Loss:{train_loss/args.acc_steps:.4f}, LR: {last_lr:.6f}, Thruput: {throughput:.2f}, Seen Tokens: {seen_tokens}, Duration: {duration_time:.3f}s, Consumed: {time.strftime('%H:%M:%S', time.gmtime(time.time() - training_start_time))}, Remaining: {time.strftime('%H:%M:%S', time.gmtime(remaining_time))}",)
                     losses = 0
                     step_start_time = time.time()
 
             if current_step % args.val_steps == 0:
-                validation_loss = evaluation(model, val_loader, wandb, global_rank, current_step)
+                validation_loss = evaluation(model, val_loader, current_step)
+                if global_rank == 0 and wandb:
+                    wandb.log({"val_loss": validation_loss}, step=current_step)
                 if current_step % args.save_steps == 0:
                     save_model(global_rank, model, tokenizer, args.model_output_path, current_step)
             

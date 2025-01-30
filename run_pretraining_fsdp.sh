@@ -3,9 +3,20 @@ set -e -x
 nvidia-smi
 pip list
 
-export WANDB_MODE=offline
+# export WANDB_MODE=offline
+export SSL_CERT_DIR=/etc/ssl/certs
+export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
 # export TORCH_LOGS="+dynamo"
 # export TORCHDYNAMO_VERBOSE=1
+
+unset GCC_HOME
+unset OSC_GCC_DIR
+unset CXX
+unset OSC_CC
+unset CC
+unset MPICC
+unset MPICXX
 
 torchrun --rdzv-backend=c10d \
     --rdzv-endpoint=localhost:0 \
@@ -23,4 +34,5 @@ torchrun --rdzv-backend=c10d \
     --train_data_cache_dir ./data/findweb-edu-1000000-1000/train \
     --val_data_cache_dir ./data/findweb-edu-1000000-1000/validation \
     --output_dir ./outputs \
-    --attn_impl flash_attention_3
+    --attn_impl flash_attention_3 \
+    --wandb_project speed-llama-1b-debug
