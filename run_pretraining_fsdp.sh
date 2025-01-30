@@ -15,8 +15,12 @@ torchrun --rdzv-backend=c10d \
     --model_name meta-llama/Llama-3.2-1B \
     --tokenizer_name meta-llama/Llama-3.2-1B \
     --sequence_length 2048 \
+    --acc_steps 4 \
+    --micro_batch_size 16 \
+    --val_batch_size 16 \
+    --val_steps 100 \
     --dtype bfloat16 \
     --train_data_cache_dir ./data/findweb-edu-1000000-1000/train \
     --val_data_cache_dir ./data/findweb-edu-1000000-1000/validation \
-    --micro_batch_size 16 \
-    --attn_impl sdpa
+    --output_dir ./outputs \
+    --attn_impl flash_attention_3

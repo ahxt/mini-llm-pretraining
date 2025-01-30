@@ -71,17 +71,6 @@ def get_parameter_names(model, forbidden_layer_types):
     return result
 
 
-def get_optimizer(model, lr, weight_decay):
-    return torch.optim.AdamW(
-        params=model.parameters(),
-        lr=lr,
-        betas=(0.9, 0.95),
-        eps=1e-8,
-        weight_decay=weight_decay,
-        fused=True
-    )
-
-
 def get_all_reduce_mean(tensor):
     torch.distributed.all_reduce(tensor, op=torch.distributed.ReduceOp.SUM)
     tensor = tensor / torch.distributed.get_world_size()
@@ -91,13 +80,6 @@ def get_all_reduce_mean(tensor):
 def clip_model_gradients(model, max_grad_norm):
     return model.clip_grad_norm_(max_grad_norm).item()
 
-
-def get_scheduler(global_rank, scheduler_type, optimizer, max_steps):
-    warmup_ratio = 0.01
-    warmup_steps = math.ceil(max_steps * warmup_ratio)
-    warmup_steps = min(warmup_steps, 1000)
-    warmup_steps = max(warmup_steps, 100)
-    return transformers.get_scheduler(name=scheduler_type, optimizer=optimizer, num_warmup_steps=warmup_steps, num_training_steps=max_steps,)
 
 
 def save_model(global_rank, model, tokenizer, outpath, current_step):
@@ -127,15 +109,16 @@ if __name__ == "__main__":
     parser.add_argument("--micro_batch_size", type=int, default=24)
     parser.add_argument("--val_batch_size", type=int, default=12)
     parser.add_argument("--acc_steps", type=int, default=4)
-    parser.add_argument("--max_steps", type=int, default=10000000000)
+    parser.add_argument("--max_steps", type=int, default=1000000)
     parser.add_argument("--log_steps", type=int, default=1)
     parser.add_argument("--val_steps", type=int, default=200)
     parser.add_argument("--save_steps", type=int, default=100000)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--warmup_iters", type=int, default=0)
+    parser.add_argument("--warmup_steps", type=int, default=20)
     parser.add_argument("--weight_decay", type=float, default=0.0)
     parser.add_argument("--grad_clip", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=14159)
+    parser.add_argument("--scheduler_type", type=str, default="cosine")
 
     args = parser.parse_args()
 
@@ -151,7 +134,6 @@ if __name__ == "__main__":
 
     model_name = args.model_name
     tokenizer_name = args.tokenizer_name
-    scheduler_type = "cosine"
     transformers.set_seed(args.seed)
 
     args.total_batch_size = args.micro_batch_size * world_size * args.acc_steps
@@ -264,9 +246,13 @@ if __name__ == "__main__":
 
     validation_loss = evaluation(model, val_loader, None, global_rank, 0)
 
-    args.max_steps = min(args.max_steps, len(train_loader)//args.acc_steps)
+    # args.max_steps = min(args.max_steps, len(train_loader)//args.acc_steps)
 
-    scheduler = get_scheduler(global_rank, scheduler_type, optimizer, args.max_steps)
+    # scheduler = get_scheduler(global_rank, scheduler_type, optimizer, args.max_steps)
+    scheduler = transformers.get_scheduler(name=args.scheduler_type, 
+                                           optimizer=optimizer, 
+                                           num_warmup_steps=args.warmup_steps, 
+                                           num_training_steps=args.max_steps,)
 
     step_start_time = time.time()
     training_start_time = time.time()
@@ -308,7 +294,7 @@ if __name__ == "__main__":
                     status_dict = {"current_loss": train_loss/args.acc_steps, "learning_rate": last_lr, "throughput": throughput}
                     wandb.log(status_dict, step=current_step)
                     remaining_time = (args.max_steps - current_step) * duration_time / args.log_steps
-                    print(f"Step: {current_step}/{args.max_steps}, Loss:{train_loss/args.acc_steps:.4f}, LR: {last_lr:.6f}, Thruput: {throughput:.2f}, Seen Tokens: {seen_tokens}, Duration: {duration_time:.3f}s, Remaining: {time.strftime('%H:%M:%S', time.gmtime(remaining_time))}",)
+                    print(f"Step: {current_step:05d}/{args.max_steps:05d}, Loss:{train_loss/args.acc_steps:.4f}, LR: {last_lr:.6f}, Thruput: {throughput:.2f}, Seen Tokens: {seen_tokens}, Duration: {duration_time:.3f}s, Consumed Time: {time.strftime('%H:%M:%S', time.gmtime(time.time() - training_start_time))}, Remaining Time: {time.strftime('%H:%M:%S', time.gmtime(remaining_time))}",)
                     losses = 0
                     step_start_time = time.time()
 
