@@ -40,5 +40,6 @@ singularity exec --nv --bind $HOME:$HOME --bind /tmp:/tmp $HOME/sif/llm_pt25_0.3
     --train_data_cache_dir ./data/findweb-edu-1000000-1000/train \
     --val_data_cache_dir ./data/findweb-edu-1000000-1000/validation \
     --output_dir ./outputs \
-    --attn_impl flash_attention_3
+    --attn_impl flash_attention_3 \
+    --wandb_project speed-llama-1b-debug
 

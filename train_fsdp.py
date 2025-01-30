@@ -279,9 +279,9 @@ if __name__ == "__main__":
                     last_lr = scheduler.get_last_lr()[0]
                     remaining_time = (args.max_steps - current_step) * duration_time / args.log_steps
 
-                    status_dict = {"train_loss": train_loss/args.acc_steps, "learning_rate": last_lr, "throughput": throughput, "seen_tokens": seen_tokens, "duration": duration_time, "consumed_time": time.strftime('%H:%M:%S', time.gmtime(time.time() - training_start_time)), "remaining_time": time.strftime('%H:%M:%S', time.gmtime(remaining_time))}
+                    status_dict = {"train_loss": train_loss/args.acc_steps, "learning_rate": last_lr, "throughput": throughput, "seen_tokens": seen_tokens, "duration": duration_time, "consumed_time": int(time.time() - training_start_time), "remaining_time": int(remaining_time)}
                     wandb.log(status_dict, step=current_step)
-                    print(f"{current_step:05d}/{args.max_steps:05d}, train_loss: {status_dict['train_loss']:.4f}, lr: {status_dict['learning_rate']:.6f}, thruput: {status_dict['throughput']:.2f}, seen_tokens: {status_dict['seen_tokens']}, duration: {status_dict['duration']:.3f}s, consumed: {status_dict['consumed_time']}, remaining: {status_dict['remaining_time']}")
+                    print(f"{current_step:05d}/{args.max_steps:05d}, train_loss: {status_dict['train_loss']:.4f}, lr: {status_dict['learning_rate']:.6f}, thruput: {status_dict['throughput']:.2f}, seen_tokens: {status_dict['seen_tokens']}, duration: {status_dict['duration']:.3f}s, consumed: {time.strftime('%H:%M:%S', time.gmtime(time.time() - training_start_time))}, remaining: {time.strftime('%H:%M:%S', time.gmtime(remaining_time))}")
                     # print(f"{current_step:05d}/{args.max_steps:05d}, Loss:{train_loss/args.acc_steps:.4f}, LR: {last_lr:.6f}, Thruput: {throughput:.2f}, Seen Tokens: {seen_tokens}, Duration: {duration_time:.3f}s, Consumed: {time.strftime('%H:%M:%S', time.gmtime(time.time() - training_start_time))}, Remaining: {time.strftime('%H:%M:%S', time.gmtime(remaining_time))}",)
                     losses = 0
                     step_start_time = time.time()
