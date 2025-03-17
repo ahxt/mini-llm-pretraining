@@ -66,3 +66,5 @@ wandb/
 data/
 outputs/
 optimizers.py
+*.out
+ops.py

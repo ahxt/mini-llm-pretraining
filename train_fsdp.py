@@ -98,7 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("--val_steps", type=int, default=200)
     parser.add_argument("--save_steps", type=int, default=100000)
     parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--warmup_steps", type=int, default=20)
+    parser.add_argument("--warmup_steps", type=int, default=200)
     parser.add_argument("--weight_decay", type=float, default=0.0)
     parser.add_argument("--grad_clip", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=14159)
